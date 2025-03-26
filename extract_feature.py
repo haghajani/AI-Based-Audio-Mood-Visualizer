@@ -1,54 +1,43 @@
 import os
-import pickle
-import tensorflow_hub as hub
+import pandas as pd
 import numpy as np
 import librosa
+import pickle
 
-def extract_vggish_features(audio_file, sr_vggish = 16000):
-    # Load audio and resample
-    y, sr = librosa.load(audio_file, sr=sr_vggish, mono=True)
-
-    num_samples = sr  # 1 second of audio
-    num_segments = len(y) // num_samples
+def get_mfccs(path):
+    X, sample_rate = librosa.load(path
+                                  , res_type='kaiser_fast'
+                                  ,duration=2.5
+                                  ,sr=44100
+                                  ,offset=0.5
+                                 )
+    sample_rate = np.array(sample_rate)
     
-    features = []
-    
-    for i in range(num_segments):
-        segment = y[i * num_samples: (i + 1) * num_samples]
-        if len(segment) < num_samples:
-            continue  # Skip short segments
-        
-        # Convert to the expected VGGish input shape
-        # segment = segment.reshape(-1)  # Reshape for model input
-        embedding = vggish_model(segment)  # Extract features
-        features.append(embedding.numpy())
-    
-    return np.mean(features, axis=0)  # Average over segments
-    
-    # embeddings = np.array(vggish_model(y))
-    # print(embeddings.shape)
-    # return embeddings
+    # mean as the feature. Could do min and max etc as well. 
+    mfccs = np.mean(librosa.feature.mfcc(y=X, 
+                                        sr=sample_rate, 
+                                        n_mfcc=13),
+                    axis=0)
+    return mfccs
 
-# Load VGGish model from TensorFlow Hub
-vggish_model = hub.load('https://tfhub.dev/google/vggish/1')
+def get_features():
+    DATASET_PATH = "dataset"
+    EMOTIONS = ["happy", "sad", "angry", "neutral", "disgust", "fearful"]
 
-DATASET_PATH = "dataset"
-EMOTIONS = ["happy", "sad", "angry", "neutral", "disgust", "fearful"]
+    df = pd.DataFrame(columns=['file', 'label', 'feature'])
+    counter = 0
 
-features = []
-labels = []
-
-for emotion in EMOTIONS:
-    emotion_folder = os.path.join(DATASET_PATH, emotion)
-    for file in os.listdir(emotion_folder):
-        file_path = os.path.join(emotion_folder, file)
-        try:
-            feature_vector = extract_vggish_features(file_path)
-            features.append(feature_vector.reshape(-1))
-            labels.append(EMOTIONS.index(emotion))  # Convert label to number
-        except Exception as e:
-            print(f"Skipping {file}: {e}")
-
-# Save extracted features
-with open("features.pkl", "wb") as f:
-    pickle.dump((features, labels), f)
+    for emotion in EMOTIONS:
+        emotion_folder = os.path.join(DATASET_PATH, emotion)
+        for file in os.listdir(emotion_folder):
+            file_path = os.path.join(emotion_folder, file)
+            try:
+                feature_vector = get_mfccs(file_path)
+                df.loc[counter] = [file_path, emotion, feature_vector]
+                counter=counter+1  
+            except Exception as e:
+                print(f"Skipping {file}: {e}")
+    df = pd.concat([df,pd.DataFrame(df['feature'].values.tolist())],axis=1)
+    df = df.drop('feature', axis=1)
+    df = df.fillna(0)
+    return df
