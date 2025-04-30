@@ -1,35 +1,23 @@
 import os
-import shutil
+import pandas as pd
 
-# Define paths
-DATASET_PATH = "1/AudioWAV/"  # Change this to your dataset root folder
-DEST_PATH = "dataset/"
+def get_RAV():
+    RAV = "RAVDESS/audio_song_actors_01-24/"
 
-# Emotion Mapping
-EMOTION_MAP = {
-    "NEU": "neutral",
-    "HAP": "happy",
-    "SAD": "sad",
-    "ANG": "angry",
-    "FEA": "fearful",
-    "DIS": "disgust"
-}
+    dir_list = os.listdir(RAV)
+    dir_list.sort()
 
-# Ensure destination directories exist
-for emotion in EMOTION_MAP.values():
-    os.makedirs(os.path.join(DEST_PATH, emotion), exist_ok=True)
-
-# Process files
-for file in os.listdir(DATASET_PATH):
-    if file.endswith(".wav"):
-        parts = file.split("_")
+    emotion = []
+    path = []
+    for i in dir_list:
+        fname = os.listdir(RAV + i)
+        for f in fname:
+            part = f.split('.')[0].split('-')
+            emotion.append(int(part[2]))
+            path.append(RAV + i + '/' + f)
         
-        if len(parts) == 4:
-            emotion_code = parts[2]   # Emotion (01 to 08)
-            emotion_folder = EMOTION_MAP.get(emotion_code, "unknown")
-            src = os.path.join(DATASET_PATH, file)
-            dest = os.path.join(DEST_PATH, emotion_folder, file)
-
-            shutil.move(src, dest)
-            print(f"Moved {file} to {emotion_folder}/")
-
+    RAV_df = pd.DataFrame(emotion)
+    RAV_df = RAV_df.replace({1:'neutral', 2:'calm', 3:'happy', 4:'sad', 5:'angry', 6:'fear', 7:'disgust', 8:'surprise'})
+    RAV_df.columns = ['label']
+    RAV_df = pd.concat([RAV_df,pd.DataFrame(path, columns = ['path'])],axis=1)
+    return RAV_df

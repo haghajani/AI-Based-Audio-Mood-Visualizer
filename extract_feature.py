@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import librosa
 import pickle
+from organize_data import get_RAV
 
 def get_mfccs(path):
     X, sample_rate = librosa.load(path
@@ -13,7 +14,6 @@ def get_mfccs(path):
                                  )
     sample_rate = np.array(sample_rate)
     
-    # mean as the feature. Could do min and max etc as well. 
     mfccs = np.mean(librosa.feature.mfcc(y=X, 
                                         sr=sample_rate, 
                                         n_mfcc=13),
@@ -21,23 +21,18 @@ def get_mfccs(path):
     return mfccs
 
 def get_features():
-    DATASET_PATH = "dataset"
-    EMOTIONS = ["happy", "sad", "angry", "neutral", "disgust", "fearful"]
 
-    df = pd.DataFrame(columns=['file', 'label', 'feature'])
-    counter = 0
+    RAV_df = get_RAV()
 
-    for emotion in EMOTIONS:
-        emotion_folder = os.path.join(DATASET_PATH, emotion)
-        for file in os.listdir(emotion_folder):
-            file_path = os.path.join(emotion_folder, file)
-            try:
-                feature_vector = get_mfccs(file_path)
-                df.loc[counter] = [file_path, emotion, feature_vector]
-                counter=counter+1  
-            except Exception as e:
-                print(f"Skipping {file}: {e}")
-    df = pd.concat([df,pd.DataFrame(df['feature'].values.tolist())],axis=1)
-    df = df.drop('feature', axis=1)
-    df = df.fillna(0)
-    return df
+    df = pd.DataFrame(columns=['feature'])
+
+    # loop feature extraction over the entire dataset
+    counter=0
+    for index,path in enumerate(RAV_df.path):
+        mfccs = get_mfccs(path)
+        df.loc[counter] = [mfccs]
+        counter=counter+1   
+
+    df = pd.concat([RAV_df,pd.DataFrame(df['feature'].values.tolist())],axis=1)
+    df=df.fillna(0)
+    return(df)
